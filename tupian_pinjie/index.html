@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>画布图片区域操作</title>
+  <style>
+    /* CSS变量定义 */
+    :root {
+      --primary-color: #4A90E2;
+      --secondary-color: #FFFFFF;
+      --background-color: #f0f2f5;
+      --card-bg-color: #ffffff;
+      --card-border-color: #e0e0e0;
+      --text-color: #333333;
+      --label-color: #555555;
+      --input-bg-color: #f9f9f9;
+      --shadow-color: rgba(0, 0, 0, 0.1);
+      --button-bg: linear-gradient(45deg, #4A90E2, #357ABD);
+      --button-hover-bg: linear-gradient(45deg, #357ABD, #4A90E2);
+      --button-text-color: #ffffff;
+      --border-radius: 8px;
+      --transition-speed: 0.3s;
+      --font-size-base: 16px; /* 调整为稍小的字体 */
+      --font-size-large: 1em;
+      --font-size-title: 2em; /* 调整标题字体大小 */
+      --font-size-section: 1.5em;
+      --gap-controls: 20px; /* 减少间距 */
+      --gap-control-section: 10px;
+      --max-main-width: 1200px; /* 保持主编辑区域最大宽度 */
+      --max-sidebar-width: 350px; /* 缩小侧边栏最大宽度 */
+    }
+
+    /* 通用样式 */
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: var(--background-color);
+      color: var(--text-color);
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+    }
+
+    h1 {
+      margin: 0 0 20px 0; /* 仅下边距 */
+      color: var(--primary-color);
+      font-size: var(--font-size-title);
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+      text-align: center;
+    }
+
+    /* 包裹容器样式 */
+    #wrapper {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      width: 100%;
+      max-width: calc(var(--max-main-width) + var(--max-sidebar-width) + 40px); /* 40px 为 padding */
+      padding: 20px;
+      box-sizing: border-box;
+      gap: 20px;
+    }
+
+    /* 主编辑区域容器样式 */
+    #main-container {
+      flex: 3;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      max-width: var(--max-main-width);
+      width: 100%;
+    }
+
+    /* 侧边栏容器样式 */
+    #sidebar {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      max-width: var(--max-sidebar-width); /* 缩小侧边栏最大宽度 */
+      width: 100%;
+      margin-top: 0; /* 移除固定顶部外边距 */
+      overflow-y: auto; /* 启用垂直滚动 */
+      padding-right: 10px; /* 添加右边距，防止内容靠边 */
+    }
+
+    /* 画布样式 */
+    canvas {
+      border: none;
+      box-shadow: 0 8px 16px var(--shadow-color);
+      border-radius: var(--border-radius);
+      display: block;
+      margin: 0 auto 30px auto; /* 移除顶部外边距，仅保留底部外边距 */
+      width: 100%;
+      height: auto; /* 高度自动调整以保持比例 */
+      background-color: var(--secondary-color);
+      image-rendering: pixelated; /* 保持图像清晰 */
+      max-width: 100%; /* 确保不超过容器宽度 */
+    }
+
+    /* 控制面板容器样式 */
+    #controls-container {
+      display: flex;
+      flex-direction: column;
+      flex-wrap: nowrap;
+      margin: 20px 0;
+      gap: var(--gap-controls);
+      width: 100%;
+    }
+
+    .control-section {
+      background-color: var(--card-bg-color);
+      border: 1px solid var(--card-border-color);
+      border-radius: var(--border-radius);
+      padding: 15px; /* 减少内边距 */
+      box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+      flex: 1 1 auto;
+      transition: transform var(--transition-speed), box-shadow var(--transition-speed);
+      box-sizing: border-box;
+    }
+
+    .control-section:hover {
+      transform: translateY(-2px); /* 减少上移距离 */
+      box-shadow: 0 6px 12px rgba(0,0,0,0.1); /* 减少阴影强度 */
+    }
+
+    .control-section h3 {
+      margin: 0 0 10px 0; /* 减少下边距 */
+      font-size: var(--font-size-section);
+      color: var(--primary-color);
+      border-bottom: 2px solid var(--primary-color);
+      padding-bottom: 5px; /* 减少内边距 */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .control-section label {
+      margin: 8px 0; /* 减少上下间距 */
+      display: flex;
+      align-items: center;
+      font-size: var(--font-size-base);
+      color: var(--label-color);
+      flex-wrap: nowrap;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .control-section label input[type="number"],
+    .control-section label input[type="color"],
+    .control-section label select,
+    .control-section label input[type="range"],
+    .control-section label input[type="checkbox"] {
+      margin-left: 8px; /* 减少左边距 */
+      flex-grow: 1;
+      height: 28px; /* 减小高度 */
+      padding: 4px; /* 减少内边距 */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      transition: border-color var(--transition-speed);
+      box-sizing: border-box;
+      background-color: var(--input-bg-color);
+    }
+
+    .control-section label input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      margin-left: 0;
+      flex-grow: 0;
+    }
+
+    .control-section label input[type="number"],
+    .control-section label input[type="color"],
+    .control-section label select,
+    .control-section label input[type="range"] {
+      background-color: var(--input-bg-color);
+    }
+
+    .control-section label input[type="number"]:focus,
+    .control-section label input[type="color"]:focus,
+    .control-section label select:focus,
+    .control-section label input[type="range"]:focus {
+      border-color: var(--primary-color);
+      outline: none;
+    }
+
+    /* 新增：控制面板中的所有文本加粗 */
+    #controls-container h3,
+    #controls-container label,
+    #controls-container span {
+      font-weight: bold;
+    }
+
+    /* 渐进色设置 */
+    #gradient-settings {
+      margin-top: 10px; /* 减少上边距 */
+      padding-top: 10px; /* 减少内边距 */
+      border-top: 1px dashed #ccc;
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 1024px) {
+      .control-section {
+        flex: 1 1 220px; /* 调整为更小的最小宽度 */
+        padding: 12px 14px; /* 进一步减少内边距 */
+      }
+    }
+
+    @media (max-width: 768px) {
+      #wrapper {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      #main-container {
+        margin-right: 0;
+      }
+
+      #sidebar {
+        max-width: 100%;
+        margin-top: 0; /* 移除顶部外边距 */
+      }
+
+      #controls-container {
+        width: 100%;
+      }
+
+      .control-section {
+        width: 100%;
+        max-width: 350px; /* 调整最大宽度 */
+      }
+
+      canvas {
+        max-width: 100%;
+        margin: 0 auto 20px auto; /* 调整底部外边距 */
+      }
+
+      /* 移除过渡设置部分的标签变为列布局 */
+      /* 覆盖原有的 #transition-controls label 设置 */
+      #transition-controls label {
+        flex-direction: row !important;
+        align-items: center !important;
+      }
+
+      #transition-controls input[type="range"] {
+        width: auto; /* 保持原有宽度 */
+      }
+
+      /* 下载按钮在小屏幕下居中 */
+      #download {
+        width: 100%;
+        max-width: 350px; /* 调整最大宽度 */
+      }
+    }
+
+    /* 上传区域间距调整 */
+    #upload-sections .upload-section {
+      margin-bottom: 10px; /* 减少下边距 */
+    }
+
+    #upload-sections .upload-section:last-child {
+      margin-bottom: 0;
+    }
+
+    /* 优化下载按钮样式 */
+    #download {
+      background: var(--button-bg);
+      color: var(--button-text-color);
+      border: none;
+      padding: 12px 25px; /* 减少内边距 */
+      font-size: var(--font-size-large);
+      border-radius: var(--border-radius);
+      cursor: pointer;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      transition: background var(--transition-speed), transform var(--transition-speed), box-shadow var(--transition-speed);
+      margin: 20px auto; /* 保持自动水平居中 */
+      display: block; /* 确保生效 */
+    }
+
+    #download:hover {
+      background: var(--button-hover-bg);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+    }
+
+    #download:active {
+      transform: translateY(0);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+
+    /* 更细腻的输入框和选择框 */
+    input[type="file"] {
+      padding: 4px; /* 减少内边距 */
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: var(--input-bg-color);
+      transition: border-color var(--transition-speed);
+      cursor: pointer;
+      font-size: 14px; /* 调整字体大小 */
+    }
+
+    input[type="file"]:focus {
+      border-color: var(--primary-color);
+      outline: none;
+    }
+
+    /* 侧边栏内按钮居中 */
+    @media (min-width: 769px) {
+      #download {
+        align-self: flex-start;
+      }
+    }
+
+    /* 强制两行两列布局 */
+    #middle-coordinates-controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px; /* 减少间距 */
+    }
+
+    /* 保证每个标签的宽度适应 */
+    #middle-coordinates-controls label {
+      flex-direction: column;
+      align-items: flex-start;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #middle-coordinates-controls label input[type="number"] {
+      width: 100%;
+      margin-left: 0;
+      margin-top: 4px;  
+    }
+
+    /* 设置所有控制面板中数值输入框的字体大小 */
+    .control-section label input[type="number"] {
+      font-size: 16px; /* 根据需求调整字体大小 */
+    }
+
+    /* 设置“画布比例”选择框的字体大小 */
+    #canvas-ratio-select {
+      font-size: 16px; /* 根据需求调整字体大小 */
+    }
+
+    /* 设置“上传图片，左边区域”选择框的字体大小 */
+    #left-upload {
+      font-size: 14px; /* 根据需求调整字体大小 */
+    }
+
+    /* 设置“上传图片，中间区域”选择框的字体大小 */
+    #middle-upload {
+      font-size: 14px; /* 根据需求调整字体大小 */
+    }
+
+    /* 设置“上传图片，右边区域”选择框的字体大小 */
+    #right-upload {
+      font-size: 14px; /* 根据需求调整字体大小 */
+    }
+
+    /* 新增：为“过渡设置”部分的标签添加左侧缩进和保持在一行 */
+    #transition-controls .transition-label {
+      margin-left: 20px; /* 根据需要调整缩进量 */
+      display: flex;
+      align-items: center;
+      white-space: nowrap;
+    }
+
+  </style>
+</head>
+<body>
+  <!-- 包裹容器 -->
+  <div id="wrapper">
+    <!-- 主编辑区域 -->
+    <div id="main-container">
+      <h1>画布区域图片操作</h1>
+      <canvas id="canvas" width="1600" height="900"></canvas> <!-- 内部尺寸固定为1600x900 -->
+    </div>
+    
+    <!-- 侧边栏容器 -->
+    <div id="sidebar">
+      <!-- 控制面板容器 -->
+      <div id="controls-container">
+        <!-- 设置模块 -->
+        <div class="control-section" id="settings-controls">
+          <h3>设置</h3>
+          <!-- 画布比例和中间区域坐标设置合并为一个模块 -->
+          <div id="canvas-and-coordinates">
+            <!-- 画布比例选择部分 -->
+            <label>
+              画布比例:
+              <select id="canvas-ratio-select">
+                <option value="16:9" selected>16:9 (1600px × 900px)</option>
+                <option value="2:1">2:1 (1600px × 800px)</option>
+                <option value="4:3">4:3 (1600px × 1200px)</option>
+                <!-- 可以根据需要添加更多比例 -->
+              </select>
+            </label>
+
+            <!-- 中间区域坐标设置部分 -->
+            <div id="middle-coordinates-controls">
+              <label>
+                左上角 X (0-1600):
+                <input type="number" id="middle-left-top-x" min="0" max="1600" value="533">
+              </label>
+              <label>
+                右上角 X (0-1600):
+                <input type="number" id="middle-right-top-x" min="0" max="1600" value="1067">
+              </label>
+              <label>
+                左下角 X (0-1600):
+                <input type="number" id="middle-left-bottom-x" min="0" max="1600" value="455">
+              </label>
+              <label>
+                右下角 X (0-1600):
+                <input type="number" id="middle-right-bottom-x" min="0" max="1600" value="1019">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- 上传图片区域 -->
+        <div class="control-section" id="upload-controls">
+          <h3>上传图片</h3>
+          <div id="upload-sections">
+            <div class="upload-section">
+              <label>
+                左边区域：
+                <input type="file" accept="image/*" id="left-upload">
+              </label>
+            </div>
+            <div class="upload-section">
+              <label>
+                中间区域：
+                <input type="file" accept="image/*" id="middle-upload">
+              </label>
+            </div>
+            <div class="upload-section">
+              <label>
+                右边区域：
+                <input type="file" accept="image/*" id="right-upload">
+              </label>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 过渡线条设置 -->
+        <div class="control-section" id="page-and-transition-controls">
+          <h3>过渡设置</h3>
+          <div style="display: flex; flex-direction: column; gap: var(--gap-controls);">
+            <!-- 过渡线条设置 -->
+            <div id="transition-controls">
+              <label class="transition-label">
+                线条宽度 (1-50)：
+                <input type="number" id="line-width" min="1" max="50" value="10">
+              </label>
+              <label class="transition-label">
+                线条颜色：
+                <input type="color" id="line-color" value="#FFFFFF">
+              </label>
+              <label class="transition-label">
+                使用渐进色：
+                <input type="checkbox" id="use-gradient">
+              </label>
+              
+              <!-- 将透明度控制移出渐进色设置 -->
+              <label class="transition-label">
+                透明度 (0-1)：
+                <input type="range" id="line-opacity" min="0" max="1" step="0.01" value="1">
+                <span id="opacity-value">1</span>
+              </label>
+
+              <!-- 渐进色设置部分保留，但不再包含渐进方向 -->
+              <div id="gradient-settings" style="display: none; width: 100%;">
+                <label class="transition-label">
+                  起始颜色：
+                  <input type="color" id="gradient-start-color" value="#FFFFFF">
+                </label>
+                <label class="transition-label">
+                  结束颜色：
+                  <input type="color" id="gradient-end-color" value="#000000">
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- 下载按钮 -->
+      <button id="download">下载合成图片</button>
+    </div>
+  </div>
+  
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const canvasInternalWidth = 1600; // 固定内部宽度
+    const canvasInternalHeight = 900;  // 固定内部高度
+    canvas.width = canvasInternalWidth;
+    canvas.height = canvasInternalHeight;
+
+    // 定义多种比例的区域配置
+    const areasConfigs = {
+      '16:9': {
+        canvasWidth: 1600,
+        canvasHeight: 900,
+        left: { 
+          name: 'left',
+          coords: [
+            {x: 0, y: 0},
+            {x: 533, y: 0},
+            {x: 455, y: 900},
+            {x: 0, y: 900}
+          ]
+        },
+        middle: { 
+          name: 'middle',
+          coords: [
+            {x: 533, y: 0},
+            {x: 1067, y: 0},
+            {x: 1019, y: 900},
+            {x: 455, y: 900}
+          ]
+        },
+        right: { 
+          name: 'right',
+          coords: [
+            {x: 1067, y: 0},
+            {x: 1600, y: 0},
+            {x: 1600, y: 900},
+            {x: 1019, y: 900}
+          ]
+        }
+      },
+      '2:1': {
+        canvasWidth: 1600,
+        canvasHeight: 800,
+        left: { 
+          name: 'left',
+          coords: [
+            {x: 0, y: 0},
+            {x: 600, y: 0},
+            {x: 500, y: 800}, 
+            {x: 0, y: 800}
+          ]
+        },
+        middle: { 
+          name: 'middle',
+          coords: [
+            {x: 600, y: 0},
+            {x: 1200, y: 0},
+            {x: 1100, y: 800}, 
+            {x: 500, y: 800} 
+          ]
+        },
+        right: { 
+          name: 'right',
+          coords: [
+            {x: 1200, y: 0},
+            {x: 1600, y: 0},
+            {x: 1600, y: 800},
+            {x: 1100, y: 800} 
+          ]
+        }
+      },
+      '4:3': {
+        canvasWidth: 1600,
+        canvasHeight: 1200,
+        left: { 
+          name: 'left',
+          coords: [
+            {x: 0, y: 0},
+            {x: 533, y: 0},
+            {x: 455, y: 1200}, 
+            {x: 0, y: 1200}
+          ]
+        },
+        middle: { 
+          name: 'middle',
+          coords: [
+            {x: 533, y: 0},
+            {x: 1067, y: 0},
+            {x: 1019, y: 1200}, 
+            {x: 455, y: 1200} 
+          ]
+        },
+        right: { 
+          name: 'right',
+          coords: [
+            {x: 1067, y: 0},
+            {x: 1600, y: 0},
+            {x: 1600, y: 1200},
+            {x: 1019, y: 1200} 
+          ]
+        }
+      }
+      // 可以根据需要添加更多比例配置
+    };
+
+    // 创建区域对象
+    const areas = {
+      left: { 
+        name: 'left',
+        path: new Path2D(),
+        coords: [], // 初始化时会在initialize函数中赋值
+        image: null, 
+        scale: 1, 
+        offsetX: 0, 
+        offsetY: 0
+      },
+      middle: { 
+        name: 'middle',
+        path: new Path2D(),
+        coords: [], // 初始化时会在initialize函数中赋值
+        image: null, 
+        scale: 1, 
+        offsetX: 0, 
+        offsetY: 0
+      },
+      right: { 
+        name: 'right',
+        path: new Path2D(),
+        coords: [], // 初始化时会在initialize函数中赋值
+        image: null, 
+        scale: 1, 
+        offsetX: 0, 
+        offsetY: 0
+      }
+    };
+
+    // 创建多边形路径
+    function createPaths() {
+      Object.values(areas).forEach(area => {
+        area.path = new Path2D();
+        area.path.moveTo(area.coords[0].x, area.coords[0].y);
+        for (let i = 1; i < area.coords.length; i++) {
+          area.path.lineTo(area.coords[i].x, area.coords[i].y);
+        }
+        area.path.closePath();
+      });
+    }
+
+    let currentConfig = null; // 初始化时会在initialize函数中赋值
+
+    let currentArea = null;
+    let dragging = false;
+    let startX, startY;
+
+    // 用于触摸缩放
+    let touchZoomStartDistance = 0;
+    let touchZoomStartScale = 1;
+
+    // Helper function to compute transition polygon
+    function computeTransitionPolygon(p1, p2, width) {
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+      if (length === 0) return [];
+      const normal = {x: dy / length, y: -dx / length}; // Perpendicular
+
+      const halfWidth = width / 2;
+      const offsetX = normal.x * halfWidth;
+      const offsetY = normal.y * halfWidth;
+
+      return [
+        {x: p1.x + offsetX, y: p1.y + offsetY},
+        {x: p2.x + offsetX, y: p2.y + offsetY},
+        {x: p2.x - offsetX, y: p2.y - offsetY},
+        {x: p1.x - offsetX, y: p1.y - offsetY}
+      ];
+    }
+
+    // 初始化过渡线条设置
+    const transitionSettings = {
+      width: 10,
+      color: '#FFFFFF',
+      useGradient: false,
+      gradientStartColor: '#FFFFFF',
+      gradientEndColor: '#000000',
+      opacity: 1
+    };
+
+    // 获取控制元素
+    const lineWidthInput = document.getElementById('line-width');
+    const lineColorInput = document.getElementById('line-color');
+    const useGradientCheckbox = document.getElementById('use-gradient');
+    const gradientSettingsDiv = document.getElementById('gradient-settings');
+    const gradientStartColorInput = document.getElementById('gradient-start-color');
+    const gradientEndColorInput = document.getElementById('gradient-end-color');
+    const lineOpacityInput = document.getElementById('line-opacity');
+    const opacityValueSpan = document.getElementById('opacity-value');
+
+    // 获取画布比例选择元素
+    const canvasRatioSelect = document.getElementById('canvas-ratio-select');
+
+    // 获取包裹容器元素
+    const wrapper = document.getElementById('wrapper');
+
+    // 获取中间区域坐标设置元素
+    const middleLeftTopXInput = document.getElementById('middle-left-top-x');
+    const middleRightTopXInput = document.getElementById('middle-right-top-x');
+    const middleLeftBottomXInput = document.getElementById('middle-left-bottom-x');
+    const middleRightBottomXInput = document.getElementById('middle-right-bottom-x');
+
+    // 获取上传控件
+    const leftUpload = document.getElementById('left-upload');
+    const middleUpload = document.getElementById('middle-upload');
+    const rightUpload = document.getElementById('right-upload');
+
+    // 获取下载按钮
+    const downloadButton = document.getElementById('download');
+
+    // 绑定画布比例选择事件
+    canvasRatioSelect.addEventListener('change', (e) => {
+      const selectedRatio = e.target.value;
+      const selectedConfig = areasConfigs[selectedRatio];
+      
+      if (!selectedConfig) {
+        alert('未找到对应的画布配置！');
+        return;
+      }
+      
+      // 更新当前配置
+      currentConfig = selectedConfig;
+      
+      // 更新画布尺寸
+      canvas.width = currentConfig.canvasWidth;
+      canvas.height = currentConfig.canvasHeight;
+      
+      // 更新控制面板中中间区域坐标输入的最大值
+      middleLeftTopXInput.max = canvas.width;
+      middleRightTopXInput.max = canvas.width;
+      middleLeftBottomXInput.max = canvas.width;
+      middleRightBottomXInput.max = canvas.width;
+      
+      // 更新中间区域坐标输入的默认值
+      middleLeftTopXInput.value = currentConfig.middle.coords[0].x;
+      middleRightTopXInput.value = currentConfig.middle.coords[1].x;
+      middleLeftBottomXInput.value = currentConfig.middle.coords[3].x;
+      middleRightBottomXInput.value = currentConfig.middle.coords[2].x;
+      
+      // 更新区域对象的坐标
+      Object.keys(areas).forEach(areaKey => {
+        areas[areaKey].coords = [...currentConfig[areaKey].coords];
+        // 重置缩放和偏移
+        areas[areaKey].scale = 1;
+        areas[areaKey].offsetX = 0;
+        areas[areaKey].offsetY = 0;
+      });
+      
+      // 重新创建路径
+      createPaths();
+      
+      // 重新绘制画布
+      drawCanvas();
+    });
+
+    // 绑定中间区域坐标输入事件
+    const middleInputs = [
+      middleLeftTopXInput,
+      middleRightTopXInput,
+      middleLeftBottomXInput,
+      middleRightBottomXInput
+    ];
+
+    middleInputs.forEach(input => {
+      input.addEventListener('change', () => {
+        // 获取用户输入的X坐标并固定Y坐标
+        const newMiddleCoords = {
+          leftTop: {
+            x: parseInt(middleLeftTopXInput.value, 10),
+            y: 0 // 固定Y坐标
+          },
+          rightTop: {
+            x: parseInt(middleRightTopXInput.value, 10),
+            y: 0 // 固定Y坐标
+          },
+          leftBottom: {
+            x: parseInt(middleLeftBottomXInput.value, 10),
+            y: canvas.height // 固定Y坐标
+          },
+          rightBottom: {
+            x: parseInt(middleRightBottomXInput.value, 10),
+            y: canvas.height // 固定Y坐标
+          }
+        };
+        
+        // 根据新的中间区域坐标，计算新的左边和右边区域坐标
+        const newLeftAreaCoords = [
+          {x: 0, y: 0},
+          {x: newMiddleCoords.leftTop.x, y: 0},
+          {x: newMiddleCoords.leftBottom.x, y: canvas.height},
+          {x: 0, y: canvas.height}
+        ];
+
+        const newRightAreaCoords = [
+          {x: newMiddleCoords.rightTop.x, y: 0},
+          {x: canvas.width, y: 0},
+          {x: canvas.width, y: canvas.height},
+          {x: newMiddleCoords.rightBottom.x, y: canvas.height}
+        ];
+
+        // 验证坐标范围和逻辑一致性
+        const validation = validateMiddleCoords(newMiddleCoords, newLeftAreaCoords, newRightAreaCoords);
+        if (!validation.valid) {
+          alert(`错误: ${validation.message}`);
+          // 恢复输入框的值为上一次有效的值
+          updateMiddleCoordinatesInputs();
+          return;
+        }
+        
+        // 如果验证通过，更新区域坐标
+        areas.middle.coords = [
+          {x: newMiddleCoords.leftTop.x, y: newMiddleCoords.leftTop.y},
+          {x: newMiddleCoords.rightTop.x, y: newMiddleCoords.rightTop.y},
+          {x: newMiddleCoords.rightBottom.x, y: newMiddleCoords.rightBottom.y},
+          {x: newMiddleCoords.leftBottom.x, y: newMiddleCoords.leftBottom.y}
+        ];
+
+        areas.left.coords = [...newLeftAreaCoords];
+        areas.right.coords = [...newRightAreaCoords];
+        
+        // 重新创建路径
+        createPaths();
+        
+        // 更新中间区域坐标设置控件的值，以反映当前中间区域的坐标
+        updateMiddleCoordinatesInputs();
+
+        // 重新绘制画布
+        drawCanvas();
+      });
+    });
+
+    // 绑定过渡线条设置控件事件
+    lineWidthInput.addEventListener('input', (e) => {
+      let value = parseInt(e.target.value, 10);
+      if (isNaN(value) || value < 1) {
+        value = 1;
+        e.target.value = value;
+      } else if (value > 50) {
+        value = 50;
+        e.target.value = value;
+      }
+      transitionSettings.width = value;
+      drawCanvas();
+    });
+
+    lineColorInput.addEventListener('input', (e) => {
+      transitionSettings.color = e.target.value;
+      drawCanvas();
+    });
+
+    useGradientCheckbox.addEventListener('change', (e) => {
+      transitionSettings.useGradient = e.target.checked;
+      gradientSettingsDiv.style.display = e.target.checked ? 'block' : 'none';
+      drawCanvas();
+    });
+
+    gradientStartColorInput.addEventListener('input', (e) => {
+      transitionSettings.gradientStartColor = e.target.value;
+      drawCanvas();
+    });
+
+    gradientEndColorInput.addEventListener('input', (e) => {
+      transitionSettings.gradientEndColor = e.target.value;
+      drawCanvas();
+    });
+
+    // 绑定透明度设置控件事件
+    lineOpacityInput.addEventListener('input', (e) => {
+      transitionSettings.opacity = parseFloat(e.target.value);
+      opacityValueSpan.textContent = e.target.value;
+      drawCanvas();
+    });
+
+    // 验证中间区域坐标的合理性
+    function validateMiddleCoords(coords, newLeftAreaCoords, newRightAreaCoords) {
+      // 1. 左上X < 右上X
+      if (coords.leftTop.x >= coords.rightTop.x) return { valid: false, message: '中间区域左上角X坐标必须小于右上角X坐标。' };
+      // 2. 左下X < 右下X
+      if (coords.leftBottom.x >= coords.rightBottom.x) return { valid: false, message: '中间区域左下角X坐标必须小于右下角X坐标。' };
+      // 3. 左上Y == 右上Y (已固定为0)
+      if (coords.leftTop.y !== coords.rightTop.y) return { valid: false, message: '中间区域左上角和右上角的Y坐标必须相同。' };
+      // 4. 左下Y == 右下Y (已固定为canvasHeight)
+      if (coords.leftBottom.y !== coords.rightBottom.y) return { valid: false, message: '中间区域左下角和右下角的Y坐标必须相同。' };
+      // 5. 中间区域不超出画布范围
+      const allX = [
+        coords.leftTop.x, coords.rightTop.x,
+        coords.leftBottom.x, coords.rightBottom.x
+      ];
+      const allY = [
+        coords.leftTop.y, coords.rightTop.y,
+        coords.leftBottom.y, coords.rightBottom.y
+      ];
+      const isXValid = allX.every(x => x >= 0 && x <= canvas.width);
+      const isYValid = allY.every(y => y >= 0 && y <= canvas.height);
+      if (!isXValid || !isYValid) return { valid: false, message: '坐标值超出画布范围。' };
+      
+      // 6. 确保中间区域的坐标在左边和右边区域之间，不重叠
+      const leftArea = newLeftAreaCoords;
+      const rightArea = newRightAreaCoords;
+
+      // 中间区域左上x >= 左边区域右上x
+      if (coords.leftTop.x < leftArea[1].x) return { valid: false, message: '中间区域左上角X坐标必须大于或等于左边区域的右上角X坐标。' };
+      // 中间区域右上x <= 右边区域左上x
+      if (coords.rightTop.x > rightArea[0].x) return { valid: false, message: '中间区域右上角X坐标必须小于或等于右边区域的左上角X坐标。' };
+      // 中间区域左下x >= 左边区域右下x
+      if (coords.leftBottom.x < leftArea[2].x) return { valid: false, message: '中间区域左下角X坐标必须大于或等于左边区域的右下角X坐标。' };
+      // 中间区域右下x <= 右边区域左下x
+      if (coords.rightBottom.x > rightArea[3].x) return { valid: false, message: '中间区域右下角X坐标必须小于或等于右边区域的左下角X坐标。' };
+
+      return { valid: true };
+    }
+
+    // 更新中间区域坐标设置控件的值，以反映当前中间区域的坐标
+    function updateMiddleCoordinatesInputs() {
+      const middle = areas.middle.coords;
+      middleLeftTopXInput.value = middle[0].x;
+      middleRightTopXInput.value = middle[1].x;
+      middleLeftBottomXInput.value = middle[3].x;
+      middleRightBottomXInput.value = middle[2].x;
+    }
+
+    // 创建多边形路径
+    function createPaths() {
+      Object.values(areas).forEach(area => {
+        area.path = new Path2D();
+        area.path.moveTo(area.coords[0].x, area.coords[0].y);
+        for (let i = 1; i < area.coords.length; i++) {
+          area.path.lineTo(area.coords[i].x, area.coords[i].y);
+        }
+        area.path.closePath();
+      });
+    }
+
+    // 绘制画布
+    function drawCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 绘制区域背景（可选）
+      ctx.fillStyle = 'rgba(240, 242, 245, 0.2)';
+      Object.values(areas).forEach(area => {
+        ctx.fill(area.path);
+      });
+
+      // 按原始顺序绘制图片
+      Object.values(areas).forEach(area => {
+        if (area.image) {
+          ctx.save();
+          ctx.clip(area.path);
+          ctx.drawImage(
+            area.image,
+            area.coords[0].x + area.offsetX,
+            area.coords[0].y + area.offsetY,
+            area.image.width * area.scale,
+            area.image.height * area.scale
+          );
+          ctx.restore();
+        }
+      });
+
+      // 在图片之间添加过渡线条
+      drawTransitionLines();
+    }
+
+    function drawTransitionLines() {
+      const { width, color, useGradient, gradientStartColor, gradientEndColor, opacity } = transitionSettings;
+      
+      // Function to convert HEX to RGBA
+      function hexToRGBA(hex, opacity) {
+        const bigint = parseInt(hex.slice(1), 16);
+        const r = (bigint >> 16) & 255;
+        const g = (bigint >> 8) & 255;
+        const b = bigint & 255;
+        return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      }
+
+      // Function to apply opacity to solid color
+      function applyOpacityToColor(color, opacity) {
+        const rgba = hexToRGBA(color, opacity);
+        return rgba;
+      }
+
+      // Function to create gradient along the transition line direction
+      function createGradient(p1, p2) {
+        // 创建沿着过渡线方向的渐进色
+        const gradient = ctx.createLinearGradient(p1.x, p1.y, p2.x, p2.y);
+        
+        // 将透明度应用到颜色
+        const startColor = hexToRGBA(gradientStartColor, opacity);
+        const endColor = hexToRGBA(gradientEndColor, opacity);
+        
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
+        
+        return gradient;
+      }
+
+      // Transition between left and middle
+      const leftMiddleStart = areas.left.coords[1]; // 右上角
+      const leftMiddleEnd = areas.left.coords[2]; // 右下角
+      const transition1 = computeTransitionPolygon(leftMiddleStart, leftMiddleEnd, width);
+
+      if (transition1.length === 4) {
+        ctx.beginPath();
+        ctx.moveTo(transition1[0].x, transition1[0].y);
+        for (let i = 1; i < transition1.length; i++) {
+          ctx.lineTo(transition1[i].x, transition1[i].y);
+        }
+        ctx.closePath();
+        
+        if (useGradient) {
+          const gradient = createGradient(leftMiddleStart, leftMiddleEnd);
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = applyOpacityToColor(color, opacity);
+        }
+        ctx.fill();
+      }
+
+      // Transition between middle and right
+      const middleRightStart = areas.middle.coords[1]; // 右上角
+      const middleRightEnd = areas.middle.coords[2]; // 右下角
+      const transition2 = computeTransitionPolygon(middleRightStart, middleRightEnd, width);
+
+      if (transition2.length === 4) {
+        ctx.beginPath();
+        ctx.moveTo(transition2[0].x, transition2[0].y);
+        for (let i = 1; i < transition2.length; i++) {
+          ctx.lineTo(transition2[i].x, transition2[i].y);
+        }
+        ctx.closePath();
+        
+        if (useGradient) {
+          const gradient = createGradient(middleRightStart, middleRightEnd);
+          ctx.fillStyle = gradient;
+        } else {
+          ctx.fillStyle = applyOpacityToColor(color, opacity);
+        }
+        ctx.fill();
+      }
+    }
+
+    function handleUpload(areaKey, file) {
+      const area = areas[areaKey];
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          area.image = img;
+          // 初始缩放以适应区域
+          const regionWidth = area.coords[1].x - area.coords[0].x;
+          const regionHeight = area.coords[3].y - area.coords[0].y;
+          const scaleX = regionWidth / img.width;
+          const scaleY = regionHeight / img.height;
+          area.scale = Math.min(scaleX, scaleY);
+          // 居中图片
+          area.offsetX = ((regionWidth) - (img.width * area.scale)) / 2;
+          area.offsetY = ((regionHeight) - (img.height * area.scale)) / 2;
+          drawCanvas();
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function getAreaUnderCursor(x, y) {
+      // 按照区域顺序从上到下检测，避免重叠
+      return Object.values(areas).find(area => ctx.isPointInPath(area.path, x, y));
+    }
+
+    // 获取实际的缩放比例
+    function getCanvasScale() {
+      const scaleX = canvas.width / canvas.clientWidth;
+      const scaleY = canvas.height / canvas.clientHeight;
+      return { scaleX, scaleY };
+    }
+
+    // 拖动相关事件（鼠标）
+    canvas.addEventListener('mousedown', e => {
+      const rect = canvas.getBoundingClientRect();
+      const { scaleX, scaleY } = getCanvasScale();
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      const area = getAreaUnderCursor(x, y);
+      if (area && area.image) {
+        currentArea = area;
+        dragging = true;
+        startX = x;
+        startY = y;
+      }
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (dragging && currentArea) {
+        const rect = canvas.getBoundingClientRect();
+        const { scaleX, scaleY } = getCanvasScale();
+        const x = (e.clientX - rect.left) * scaleX;
+        const y = (e.clientY - rect.top) * scaleY;
+        const dx = x - startX;
+        const dy = y - startY;
+
+        // 更新偏移量
+        currentArea.offsetX += dx;
+        currentArea.offsetY += dy;
+
+        // 计算图片尺寸
+        const imgWidth = currentArea.image.width * currentArea.scale;
+        const imgHeight = currentArea.image.height * currentArea.scale;
+
+        // 获取区域边界
+        const bounds = {
+          minX: currentArea.coords[0].x,
+          minY: currentArea.coords[0].y,
+          maxX: currentArea.coords[1].x,
+          maxY: currentArea.coords[3].y
+        };
+
+        // 计算允许的最小和最大偏移量
+        const minOffsetX = Math.min(bounds.maxX - bounds.minX - imgWidth, 0);
+        const maxOffsetX = Math.max(bounds.maxX - bounds.minX - imgWidth, 0);
+
+        const minOffsetY = Math.min(bounds.maxY - bounds.minY - imgHeight, 0);
+        const maxOffsetY = Math.max(bounds.maxY - bounds.minY - imgHeight, 0);
+
+        // 限制偏移量
+        currentArea.offsetX = Math.min(currentArea.offsetX, maxOffsetX);
+        currentArea.offsetX = Math.max(currentArea.offsetX, minOffsetX);
+        currentArea.offsetY = Math.min(currentArea.offsetY, maxOffsetY);
+        currentArea.offsetY = Math.max(currentArea.offsetY, minOffsetY);
+
+        startX = x;
+        startY = y;
+        drawCanvas();
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      dragging = false;
+      currentArea = null;
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      dragging = false;
+      currentArea = null;
+    });
+
+    // 添加触摸事件支持
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd);
+    canvas.addEventListener('touchcancel', handleTouchEnd);
+
+    function handleTouchStart(e) {
+      e.preventDefault(); // 阻止默认的触摸行为（如滚动）
+
+      const rect = canvas.getBoundingClientRect();
+      const touches = e.touches;
+
+      if (touches.length === 1) {
+        // 单指拖动
+        const touch = touches[0];
+        const { scaleX, scaleY } = getCanvasScale();
+        const x = (touch.clientX - rect.left) * scaleX;
+        const y = (touch.clientY - rect.top) * scaleY;
+        const area = getAreaUnderCursor(x, y);
+        if (area && area.image) {
+          currentArea = area;
+          dragging = true;
+          startX = x;
+          startY = y;
+        }
+      } else if (touches.length === 2 && currentArea && currentArea.image) {
+        // 双指缩放
+        const touch1 = touches[0];
+        const touch2 = touches[1];
+        const x1 = (touch1.clientX - rect.left) * getCanvasScale().scaleX;
+        const y1 = (touch1.clientY - rect.top) * getCanvasScale().scaleY;
+        const x2 = (touch2.clientX - rect.left) * getCanvasScale().scaleX;
+        const y2 = (touch2.clientY - rect.top) * getCanvasScale().scaleY;
+        touchZoomStartDistance = Math.hypot(x2 - x1, y2 - y1);
+        touchZoomStartScale = currentArea.scale;
+      }
+    }
+
+    function handleTouchMove(e) {
+      e.preventDefault(); // 阻止默认的触摸行为（如滚动）
+
+      const rect = canvas.getBoundingClientRect();
+      const touches = e.touches;
+
+      if (touches.length === 1 && dragging && currentArea) {
+        // 单指拖动
+        const touch = touches[0];
+        const { scaleX, scaleY } = getCanvasScale();
+        const x = (touch.clientX - rect.left) * scaleX;
+        const y = (touch.clientY - rect.top) * scaleY;
+        const dx = x - startX;
+        const dy = y - startY;
+
+        // 更新偏移量
+        currentArea.offsetX += dx;
+        currentArea.offsetY += dy;
+
+        // 计算图片尺寸
+        const imgWidth = currentArea.image.width * currentArea.scale;
+        const imgHeight = currentArea.image.height * currentArea.scale;
+
+        // 获取区域边界
+        const bounds = {
+          minX: currentArea.coords[0].x,
+          minY: currentArea.coords[0].y,
+          maxX: currentArea.coords[1].x,
+          maxY: currentArea.coords[3].y
+        };
+
+        // 计算允许的最小和最大偏移量
+        const minOffsetX = Math.min(bounds.maxX - bounds.minX - imgWidth, 0);
+        const maxOffsetX = Math.max(bounds.maxX - bounds.minX - imgWidth, 0);
+
+        const minOffsetY = Math.min(bounds.maxY - bounds.minY - imgHeight, 0);
+        const maxOffsetY = Math.max(bounds.maxY - bounds.minY - imgHeight, 0);
+
+        // 限制偏移量
+        currentArea.offsetX = Math.min(currentArea.offsetX, maxOffsetX);
+        currentArea.offsetX = Math.max(currentArea.offsetX, minOffsetX);
+        currentArea.offsetY = Math.min(currentArea.offsetY, maxOffsetY);
+        currentArea.offsetY = Math.max(currentArea.offsetY, minOffsetY);
+
+        startX = x;
+        startY = y;
+        drawCanvas();
+      } else if (touches.length === 2 && currentArea) {
+        // 双指缩放
+        const touch1 = touches[0];
+        const touch2 = touches[1];
+        const x1 = (touch1.clientX - rect.left) * getCanvasScale().scaleX;
+        const y1 = (touch1.clientY - rect.top) * getCanvasScale().scaleY;
+        const x2 = (touch2.clientX - rect.left) * getCanvasScale().scaleX;
+        const y2 = (touch2.clientY - rect.top) * getCanvasScale().scaleY;
+        const currentDistance = Math.hypot(x2 - x1, y2 - y1);
+        const scaleChange = currentDistance / touchZoomStartDistance;
+        currentArea.scale = touchZoomStartScale * scaleChange;
+
+        // 限制缩放比例
+        currentArea.scale = Math.max(0.1, Math.min(currentArea.scale, 5));
+
+        // 计算图片尺寸
+        const imgWidth = currentArea.image.width * currentArea.scale;
+        const imgHeight = currentArea.image.height * currentArea.scale;
+
+        // 获取区域边界
+        const bounds = {
+          minX: currentArea.coords[0].x,
+          minY: currentArea.coords[0].y,
+          maxX: currentArea.coords[1].x,
+          maxY: currentArea.coords[3].y
+        };
+
+        // 计算允许的最小和最大偏移量
+        const minOffsetX = Math.min(bounds.maxX - bounds.minX - imgWidth, 0);
+        const maxOffsetX = Math.max(bounds.maxX - bounds.minX - imgWidth, 0);
+
+        const minOffsetY = Math.min(bounds.maxY - bounds.minY - imgHeight, 0);
+        const maxOffsetY = Math.max(bounds.maxY - bounds.minY - imgHeight, 0);
+
+        // 调整偏移量以确保图片在区域内
+        currentArea.offsetX = Math.min(currentArea.offsetX, maxOffsetX);
+        currentArea.offsetX = Math.max(currentArea.offsetX, minOffsetX);
+        currentArea.offsetY = Math.min(currentArea.offsetY, maxOffsetY);
+        currentArea.offsetY = Math.max(currentArea.offsetY, minOffsetY);
+
+        drawCanvas();
+      }
+    }
+
+    function handleTouchEnd(e) {
+      if (e.touches.length < 2) {
+        touchZoomStartDistance = 0;
+        touchZoomStartScale = 1;
+      }
+      if (e.touches.length === 0) {
+        dragging = false;
+        currentArea = null;
+      }
+    }
+
+    // 添加鼠标滚轮缩放功能
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault(); // 防止页面滚动
+
+      const rect = canvas.getBoundingClientRect();
+      const { scaleX, scaleY } = getCanvasScale();
+      const x = (e.clientX - rect.left) * scaleX;
+      const y = (e.clientY - rect.top) * scaleY;
+      const area = getAreaUnderCursor(x, y);
+
+      if (area && area.image) {
+        const zoomIntensity = 0.1;
+        if (e.deltaY < 0) {
+          // 放大
+          area.scale *= (1 + zoomIntensity);
+        } else {
+          // 缩小
+          area.scale *= (1 - zoomIntensity);
+        }
+
+        // 限制缩放比例
+        area.scale = Math.max(0.1, Math.min(area.scale, 5));
+
+        // 计算图片尺寸
+        const imgWidth = area.image.width * area.scale;
+        const imgHeight = area.image.height * area.scale;
+
+        // 获取区域边界
+        const bounds = {
+          minX: area.coords[0].x,
+          minY: area.coords[0].y,
+          maxX: area.coords[1].x,
+          maxY: area.coords[3].y
+        };
+
+        // 计算允许的最小和最大偏移量
+        const minOffsetX = Math.min(bounds.maxX - bounds.minX - imgWidth, 0);
+        const maxOffsetX = Math.max(bounds.maxX - bounds.minX - imgWidth, 0);
+
+        const minOffsetY = Math.min(bounds.maxY - bounds.minY - imgHeight, 0);
+        const maxOffsetY = Math.max(bounds.maxY - bounds.minY - imgHeight, 0);
+
+        // 调整偏移量以确保图片在区域内
+        area.offsetX = Math.min(area.offsetX, maxOffsetX);
+        area.offsetX = Math.max(area.offsetX, minOffsetX);
+        area.offsetY = Math.min(area.offsetY, maxOffsetY);
+        area.offsetY = Math.max(area.offsetY, minOffsetY);
+
+        drawCanvas();
+      }
+    }, { passive: false }); // 设置passive为false以允许preventDefault
+
+    // 绑定上传事件
+    leftUpload.addEventListener('change', e => {
+      if (e.target.files[0]) handleUpload('left', e.target.files[0]);
+    });
+    middleUpload.addEventListener('change', e => {
+      if (e.target.files[0]) handleUpload('middle', e.target.files[0]);
+    });
+    rightUpload.addEventListener('change', e => {
+      if (e.target.files[0]) handleUpload('right', e.target.files[0]);
+    });
+
+    // 下载合成图片
+    downloadButton.addEventListener('click', () => {
+      const link = document.createElement('a');
+      link.download = 'canvas-image.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    });
+
+    // 初始化画布和区域
+    function initialize() {
+      // 获取选择框的当前值
+      const selectedRatio = canvasRatioSelect.value;
+      currentConfig = areasConfigs[selectedRatio];
+      
+      // 更新画布尺寸
+      canvas.width = currentConfig.canvasWidth;
+      canvas.height = currentConfig.canvasHeight;
+      
+      // 更新控制面板中中间区域坐标输入的最大值
+      middleLeftTopXInput.max = canvas.width;
+      middleRightTopXInput.max = canvas.width;
+      middleLeftBottomXInput.max = canvas.width;
+      middleRightBottomXInput.max = canvas.width;
+      
+      // 初始化区域坐标
+      Object.keys(areas).forEach(areaKey => {
+        areas[areaKey].coords = [...currentConfig[areaKey].coords];
+        // 初始化路径
+        areas[areaKey].path = new Path2D();
+        areas[areaKey].scale = 1;
+        areas[areaKey].offsetX = 0;
+        areas[areaKey].offsetY = 0;
+      });
+      
+      // 创建路径
+      createPaths();
+      
+      // 更新中间区域坐标输入的默认值
+      updateMiddleCoordinatesInputs();
+      
+      // 绘制初始画布
+      drawCanvas();
+    }
+
+    // 重新调整画布尺寸并重新绘制
+    function resizeCanvas() {
+      // 保持画布内部尺寸不变，使用CSS来响应式缩放
+      // 画布内部尺寸固定为1600x900，CSS设置宽度为100%
+      // 事件坐标映射已根据实际显示尺寸进行调整
+      drawCanvas();
+    }
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+    });
+
+    // 初始化页面
+    initialize();
+  </script>
+</body>
+</html>
